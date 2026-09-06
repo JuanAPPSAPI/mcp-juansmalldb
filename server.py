@@ -185,8 +185,14 @@ app = mcp.streamable_http_app()
 
 class SecretHeaderMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
-        if MCP_SECRET and request.headers.get("x-mcp-secret") != MCP_SECRET:
-            return JSONResponse({"error": "unauthorized"}, status_code=401)
+        if MCP_SECRET:
+            auth_header = request.headers.get("authorization", "")
+            token_from_header = (
+                auth_header[7:] if auth_header.lower().startswith("bearer ") else ""
+            )
+            token_from_query = request.query_params.get("secret", "")
+            if MCP_SECRET not in (token_from_header, token_from_query):
+                return JSONResponse({"error": "unauthorized"}, status_code=401)
         return await call_next(request)
 
 
