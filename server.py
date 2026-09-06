@@ -33,6 +33,7 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse
 
 from mcp.server.mcpserver import MCPServer
+from mcp.server.transport_security import TransportSecuritySettings
 
 # ---------------------------------------------------------------------------
 # Configuración
@@ -41,6 +42,12 @@ SMALLDB_BASE_URL = os.environ.get("SMALLDB_BASE_URL", "").rstrip("/")
 SMALLDB_ADMIN_KEY = os.environ.get("SMALLDB_ADMIN_KEY", "")
 MCP_SECRET = os.environ.get("MCP_SECRET", "")
 PORT = int(os.environ.get("PORT", "8000"))
+
+# Dominio público donde vive este servidor (Render, tu propio dominio, etc.).
+# Se usa para la protección anti DNS-rebinding del SDK de mcp: si el header
+# Host de la petición no está en esta lista, el SDK la rechaza con 421 antes
+# de que llegue a cualquier otro middleware (incluido SecretHeaderMiddleware).
+PUBLIC_HOST = os.environ.get("PUBLIC_HOST", "smalldb-mcp.onrender.com")
 
 if not SMALLDB_BASE_URL or not SMALLDB_ADMIN_KEY:
     raise RuntimeError(
@@ -178,9 +185,21 @@ async def delete_collection(project_id: int, collection_id: int) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# App ASGI (Starlette) + protección opcional con MCP_SECRET
+# App ASGI (Starlette) + protección de transporte + protección opcional con MCP_SECRET
 # ---------------------------------------------------------------------------
-app = mcp.streamable_http_app()
+
+# El SDK de mcp activa por defecto una protección anti DNS-rebinding que solo
+# confía en localhost/127.0.0.1. Como este servidor corre en un dominio
+# público (Render), hay que declarar explícitamente ese host en la allowlist;
+# si no, el SDK rechaza toda petición real con 421 "Invalid Host header"
+# antes de que SecretHeaderMiddleware pueda evaluarla.
+_transport_security = TransportSecuritySettings(
+    enable_dns_rebinding_protection=True,
+    allowed_hosts=[PUBLIC_HOST, f"{PUBLIC_HOST}:*", "localhost:*", "127.0.0.1:*"],
+    allowed_origins=[f"https://{PUBLIC_HOST}"],
+)
+
+app = mcp.streamable_http_app(transport_security=_transport_security)
 
 
 class SecretHeaderMiddleware(BaseHTTPMiddleware):
