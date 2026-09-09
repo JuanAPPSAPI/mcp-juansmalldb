@@ -184,6 +184,87 @@ async def delete_collection(project_id: int, collection_id: int) -> dict:
     return await _request("DELETE", f"/api/admin/projects/{project_id}/collections/{collection_id}")
 
 
+@mcp.tool()
+async def list_documents(project_id: int, collection_id: int) -> list[dict]:
+    """Lista todos los documentos de una colección, con su _id, contenido y fechas.
+
+    Args:
+        project_id: id del proyecto.
+        collection_id: id de la colección.
+    """
+    data = await _request(
+        "GET", f"/api/admin/projects/{project_id}/collections/{collection_id}/documents"
+    )
+    return data["documents"]
+
+
+@mcp.tool()
+async def get_document(project_id: int, collection_id: int, doc_id: str) -> dict:
+    """Obtiene un documento individual por su _id.
+
+    Args:
+        project_id: id del proyecto.
+        collection_id: id de la colección.
+        doc_id: el _id del documento (lo devuelve list_documents / create_document).
+    """
+    return await _request(
+        "GET", f"/api/admin/projects/{project_id}/collections/{collection_id}/documents/{doc_id}"
+    )
+
+
+@mcp.tool()
+async def create_document(project_id: int, collection_id: int, data: dict) -> dict:
+    """Crea un documento nuevo dentro de una colección.
+
+    Args:
+        project_id: id del proyecto.
+        collection_id: id de la colección.
+        data: diccionario JSON con los campos del documento. Puedes incluir
+            la clave "_id" para forzar un identificador específico; si no,
+            se genera uno automáticamente.
+    """
+    return await _request(
+        "POST", f"/api/admin/projects/{project_id}/collections/{collection_id}/documents", json=data
+    )
+
+
+@mcp.tool()
+async def update_document(
+    project_id: int, collection_id: int, doc_id: str, data: dict, replace: bool = False
+) -> dict:
+    """Edita un documento existente dentro de una colección.
+
+    Args:
+        project_id: id del proyecto.
+        collection_id: id de la colección.
+        doc_id: el _id del documento a editar.
+        data: campos a actualizar. Por defecto solo se combinan (patch parcial)
+            con los campos existentes del documento.
+        replace: si es True, reemplaza el documento completo con `data` en vez
+            de solo actualizar los campos dados.
+    """
+    method = "PUT" if replace else "PATCH"
+    return await _request(
+        method,
+        f"/api/admin/projects/{project_id}/collections/{collection_id}/documents/{doc_id}",
+        json=data,
+    )
+
+
+@mcp.tool()
+async def delete_document(project_id: int, collection_id: int, doc_id: str) -> dict:
+    """Elimina un documento individual de una colección. No se puede deshacer.
+
+    Args:
+        project_id: id del proyecto.
+        collection_id: id de la colección.
+        doc_id: el _id del documento a eliminar.
+    """
+    return await _request(
+        "DELETE", f"/api/admin/projects/{project_id}/collections/{collection_id}/documents/{doc_id}"
+    )
+
+
 # ---------------------------------------------------------------------------
 # App ASGI (Starlette) + protección de transporte + protección opcional con MCP_SECRET
 # ---------------------------------------------------------------------------
